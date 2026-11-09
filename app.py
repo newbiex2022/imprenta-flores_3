@@ -62,7 +62,7 @@ REF_SAT = st.sidebar.number_input(
 # ⚠️ CAMBIO REALIZADO: Conexión mediante SQLAlchemy optimizada para Streamlit
 def obtener_conexion():
     """Crea y retorna una conexión a la base de datos MySQL."""
-    cadena_conexion = f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    cadena_conexion = f"mysql+mysqlconnector://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     return create_engine(cadena_conexion)
 
 
