@@ -23,12 +23,12 @@ REFRESCO = 5 # Cada cuántos segundos se actualizan las pantallas
 
 st.set_page_config(page_title="Imprenta Flores", layout="centered")
 
-st.sidebar.title("Imprenta Floresz")
+st.sidebar.title("Imprenta Flores")
 menu = st.sidebar.radio("¿Qué deseas hacer?", [
     "⏱️ Registrar un cliente",
     "📊 Dashboard Descriptivo",
     "📈 Análisis Inferencial",
-    "🛠️ Modo Ingeniero (Ver BD MySQL)"
+    "🛠️ Modo Ingeniero (Ver BD)"
 ])
 
 # ----------------------------------------------------------------------
@@ -239,7 +239,7 @@ def vista_registro():
     mostrar_ultimos()
 
 
-@st.fragment(run_every=REFRESCO)
+@st.fragment
 def mostrar_ultimos():
     df = cargar_datos()
     st.caption(f"Total de clientes registrados: {len(df)}")
@@ -254,7 +254,7 @@ def mostrar_ultimos():
 # ----------------------------------------------------------------------
 # PANTALLA 2: DASHBOARD DESCRIPTIVO (se actualiza solo)
 # ----------------------------------------------------------------------
-@st.fragment(run_every=REFRESCO)
+@st.fragment
 def vista_dashboard():
     st.title("Resumen de tu negocio")
     df = cargar_datos()
@@ -291,7 +291,7 @@ def vista_dashboard():
 # ----------------------------------------------------------------------
 # PANTALLA 3: INFERENCIA ESTADÍSTICA (se actualiza sola)
 # ----------------------------------------------------------------------
-@st.fragment(run_every=REFRESCO)
+@st.fragment
 def vista_inferencial():
     st.title("Análisis Estadístico del Negocio")
     st.caption(f"🔄 Actualización automática cada {REFRESCO} s · "
@@ -397,9 +397,9 @@ def vista_inferencial():
 # ----------------------------------------------------------------------
 # PANTALLA 4: TABLA MYSQL (se actualiza sola)
 # ----------------------------------------------------------------------
-@st.fragment(run_every=REFRESCO)
+@st.fragment
 def vista_excel():
-    st.title("Base de datos MySQL en tiempo real")
+    st.title("Ultimos registros en tiempo real")
     df = cargar_datos()
     st.caption(f"🔄 Actualización automática cada {REFRESCO} s · "
                f"{len(df)} registros · Última lectura: {datetime.now().strftime('%H:%M:%S')}")
