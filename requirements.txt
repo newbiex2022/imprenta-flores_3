@@ -3,4 +3,4 @@ pandas
 plotly
 scipy
 numpy
-openpyxl
+mysql-connector-python

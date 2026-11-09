@@ -1,5 +1,4 @@
 import os
-import threading
 from datetime import datetime, time as dtime
 
 import streamlit as st
@@ -7,13 +6,20 @@ import pandas as pd
 import plotly.express as px
 import scipy.stats as stats
 import numpy as np
-from openpyxl import load_workbook
+from sqlalchemy import create_engine, text
 
 # ----------------------------------------------------------------------
-# CONFIGURACIÓN - Base de datos
+# CONFIGURACIÓN - Base de Datos MySQL
 # ----------------------------------------------------------------------
-ARCHIVO = "Datos.xlsx"   # Base de datos (debe estar junto a este archivo)
-REFRESCO = 5             # Cada cuántos segundos se actualizan las pantallas
+# ⚠️ CAMBIO REALIZADO: Se reemplazó el archivo Excel por credenciales MySQL
+DB_HOST = "sql.freedb.tech"
+DB_USER = "freedb_SdZBKmVn"
+DB_PASS = "GuRDzy62Ju88"
+DB_NAME = "imprenta_2"
+DB_PORT = 3306
+DB_TABLE = "imprenta_2"
+
+REFRESCO = 5 # Cada cuántos segundos se actualizan las pantallas
 
 st.set_page_config(page_title="Imprenta Flores", layout="centered")
 
@@ -22,7 +28,7 @@ menu = st.sidebar.radio("¿Qué deseas hacer?", [
     "⏱️ Registrar un cliente",
     "📊 Dashboard Descriptivo",
     "📈 Análisis Inferencial",
-    "🛠️ Modo Ingeniero (Ver Excel)"
+    "🛠️ Modo Ingeniero (Ver BD MySQL)"
 ])
 
 # ----------------------------------------------------------------------
@@ -31,7 +37,6 @@ menu = st.sidebar.radio("¿Qué deseas hacer?", [
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚙️ Configuración de Metas")
 
-# Restringido: El tiempo mínimo útil es 0.5 min (sin negativos ni 0)
 REF_TIEMPO = st.sidebar.number_input(
     "Meta máx. de tiempo (min)", 
     min_value=0.5, 
@@ -41,7 +46,6 @@ REF_TIEMPO = st.sidebar.number_input(
     key="ref_tiempo"
 )
 
-# Restringido: El porcentaje de satisfacción va de 1% a 100%
 REF_SAT = st.sidebar.number_input(
     "Meta mín. satisfacción (%)", 
     min_value=1, 
@@ -53,25 +57,28 @@ REF_SAT = st.sidebar.number_input(
 
 
 # ----------------------------------------------------------------------
-# BASE DE DATOS (EXCEL)
+# BASE DE DATOS (CONEXIÓN Y CONSULTAS MYSQL)
 # ----------------------------------------------------------------------
-@st.cache_resource
-def obtener_candado():
-    """Un solo candado compartido por todas las sesiones, para que dos
-    registros simultáneos no se pisen al escribir el Excel."""
-    return threading.Lock()
+# ⚠️ CAMBIO REALIZADO: Conexión mediante SQLAlchemy optimizada para Streamlit
+def obtener_conexion():
+    """Crea y retorna una conexión a la base de datos MySQL."""
+    cadena_conexion = f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    return create_engine(cadena_conexion)
 
 
 def _convertir_a_minutos(t):
+    """Convierte un objeto timedelta, time o cadena de MySQL a minutos decimales."""
     try:
-        return t.hour * 60 + t.minute + t.second / 60
+        if isinstance(t, pd.Timedelta):
+            return t.total_seconds() / 60.0
+        return t.hour * 60 + t.minute + t.second / 60.0
     except Exception:
         partes = str(t).split(':')
-        return int(partes[0]) * 60 + int(partes[1]) + float(partes[2]) / 60
+        return int(partes[0]) * 60 + int(partes[1]) + float(partes[2]) / 60.0
 
 
 def _formatear_minutos_a_mmss(minutos_decimal):
-    """Convierte un valor decimal de minutos a formato 'MM:SS' para mostrarse amigable."""
+    """Convierte un valor decimal de minutos a formato 'MM:SS'."""
     try:
         total_segundos = int(round(float(minutos_decimal) * 60))
         m, s = divmod(total_segundos, 60)
@@ -80,52 +87,63 @@ def _formatear_minutos_a_mmss(minutos_decimal):
         return str(minutos_decimal)
 
 
-@st.cache_data
-def _leer_excel(ruta, fecha_modificacion):
-    """La caché depende de la fecha de modificación del archivo: si el Excel
-    cambia (por la app o editado a mano), se vuelve a leer automáticamente."""
-    df = pd.read_excel(ruta)
-    df = df.iloc[:, :5]
-    df.columns = ['GRUPO DE SERVICIO', 'SERVICIO', 'TIEMPO_EXCEL', 'SEXO', 'SATISFACCION']
-    df = df.dropna(subset=['GRUPO DE SERVICIO'])
-    df['Minutos'] = df['TIEMPO_EXCEL'].apply(_convertir_a_minutos)
-    df['SATISFACCION'] = df['SATISFACCION'].astype(str).str.strip()
-    df.index = range(1, len(df) + 1)
-    return df
-
-
+# ⚠️ CAMBIO REALIZADO: Carga directa desde MySQL usando pandas read_sql
 def cargar_datos():
+    """Lee todas las filas de la tabla imprenta_2 en MySQL y formatea las columnas igual que la versión de Excel."""
     try:
-        return _leer_excel(ARCHIVO, os.path.getmtime(ARCHIVO))
-    except FileNotFoundError:
-        st.error(f"No encuentro el archivo {ARCHIVO}. Debe estar en la misma carpeta que app.py.")
-        st.stop()
+        engine = obtener_conexion()
+        query = f"SELECT codigo, grupo, servicio, tiempo, sexo, satisfaccion, fecha_actual FROM {DB_TABLE} ORDER BY codigo ASC"
+        df = pd.read_sql(query, con=engine)
+        
+        if df.empty:
+            # Retornar estructura base en caso de tabla vacía
+            return pd.DataFrame(columns=['GRUPO DE SERVICIO', 'SERVICIO', 'TIEMPO_EXCEL', 'SEXO', 'SATISFACCION', 'Minutos', 'CODIGO', 'FECHA_ACTUAL'])
+
+        # Mapeo a las columnas que consume la lógica original
+        df.rename(columns={
+            'codigo': 'CODIGO',
+            'grupo': 'GRUPO DE SERVICIO',
+            'servicio': 'SERVICIO',
+            'tiempo': 'TIEMPO_EXCEL',
+            'sexo': 'SEXO',
+            'satisfaccion': 'SATISFACCION',
+            'fecha_actual': 'FECHA_ACTUAL'
+        }, inplace=True)
+
+        df['Minutos'] = df['TIEMPO_EXCEL'].apply(_convertir_a_minutos)
+        df['SATISFACCION'] = df['SATISFACCION'].astype(str).str.strip()
+        df.index = range(1, len(df) + 1)
+        return df
+
     except Exception as e:
-        st.warning(f"No pude leer el Excel en este momento (¿se está guardando?). Reintentando... ({e})")
+        st.error(f"Error de conexión o lectura en la base de datos MySQL: {e}")
         st.stop()
 
 
+# ⚠️ CAMBIO REALIZADO: Reemplazo de escritura en Excel por la sentencia INSERT de MySQL
 def guardar_registro(grupo, servicio, sexo, minutos, satisfaccion):
-    """Agrega una fila al final del Excel sin reescribir todo el archivo."""
+    """Agrega un registro a la tabla imprenta_2 en MySQL con timestamp automático."""
     total_seg = int(round(minutos * 60))
     m, s = divmod(total_seg, 60)
     h, m = divmod(m, 60)
+    tiempo_formateado = f"{h:02d}:{m:02d}:{s:02d}"
+    fecha_hoy = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    with obtener_candado():
-        wb = load_workbook(ARCHIVO)
-        ws = wb.active
-        fila = ws.max_row
-        while fila > 1 and ws.cell(fila, 1).value is None:
-            fila -= 1
-        fila += 1
-
-        ws.cell(fila, 1, grupo)
-        ws.cell(fila, 2, servicio)
-        celda_tiempo = ws.cell(fila, 3, dtime(h, m, s))
-        celda_tiempo.number_format = "h:mm:ss"
-        ws.cell(fila, 4, sexo)
-        ws.cell(fila, 5, satisfaccion)
-        wb.save(ARCHIVO)
+    engine = obtener_conexion()
+    query = text(f"""
+        INSERT INTO {DB_TABLE} (grupo, servicio, tiempo, sexo, satisfaccion, fecha_actual)
+        VALUES (:grupo, :servicio, :tiempo, :sexo, :satisfaccion, :fecha_actual)
+    """)
+    
+    with engine.begin() as conn:
+        conn.execute(query, {
+            "grupo": grupo,
+            "servicio": servicio,
+            "tiempo": tiempo_formateado,
+            "sexo": sexo,
+            "satisfaccion": satisfaccion,
+            "fecha_actual": fecha_hoy
+        })
 
 
 def intervalo_wilson(k, n, z=1.96):
@@ -144,9 +162,6 @@ def es_optimo(serie):
 # COMPONENTE VISUAL: SEMÁFORO DE 3 LUCES (1 ENCENDIDA, 2 APAGADAS)
 # ----------------------------------------------------------------------
 def mostrar_semaforo_visual(tiempo_promedio, tiempo_ideal=5.0, tolerancia=1.2):
-    """
-    Renderiza un semáforo visual con 3 luces utilizando HTML/CSS dentro de Streamlit.
-    """
     umbral_amarillo = tiempo_ideal * tolerancia
 
     if tiempo_promedio <= tiempo_ideal:
@@ -215,12 +230,9 @@ def vista_registro():
                 minutos=tiempo,
                 satisfaccion='OPTIMO' if "Sí" in satisfaccion else 'REGULAR',
             )
-            st.success("¡Listo! Registro guardado. El dashboard y el análisis se actualizan solos.")
-        except PermissionError:
-            st.error("No se pudo guardar: el Excel está abierto en otro programa. "
-                     "Ciérralo e inténtalo de nuevo.")
+            st.success("¡Listo! Registro guardado en MySQL. El dashboard y el análisis se actualizan solos.")
         except Exception as e:
-            st.error(f"No se pudo guardar el registro: {e}")
+            st.error(f"No se pudo guardar el registro en MySQL: {e}")
 
     st.divider()
     st.subheader("Últimos registros")
@@ -232,12 +244,11 @@ def mostrar_ultimos():
     df = cargar_datos()
     st.caption(f"Total de clientes registrados: {len(df)}")
     
-    # Creamos una copia para mostrar los minutos formateados como MM:SS en la tabla visual
-    df_visual = df[['GRUPO DE SERVICIO', 'SERVICIO', 'Minutos', 'SEXO', 'SATISFACCION']].tail(5).iloc[::-1].copy()
-    df_visual['TIEMPO (MM:SS)'] = df_visual['Minutos'].apply(_formatear_minutos_a_mmss)
-    df_visual = df_visual[['GRUPO DE SERVICIO', 'SERVICIO', 'TIEMPO (MM:SS)', 'SEXO', 'SATISFACCION']]
-    
-    st.dataframe(df_visual, use_container_width=True)
+    if not df.empty:
+        df_visual = df[['GRUPO DE SERVICIO', 'SERVICIO', 'Minutos', 'SEXO', 'SATISFACCION']].tail(5).iloc[::-1].copy()
+        df_visual['TIEMPO (MM:SS)'] = df_visual['Minutos'].apply(_formatear_minutos_a_mmss)
+        df_visual = df_visual[['GRUPO DE SERVICIO', 'SERVICIO', 'TIEMPO (MM:SS)', 'SEXO', 'SATISFACCION']]
+        st.dataframe(df_visual, use_container_width=True)
 
 
 # ----------------------------------------------------------------------
@@ -249,6 +260,10 @@ def vista_dashboard():
     df = cargar_datos()
     st.caption(f"🔄 Actualización automática cada {REFRESCO} s · "
                f"Última lectura: {datetime.now().strftime('%H:%M:%S')}")
+
+    if df.empty:
+        st.info("No hay datos guardados aún en MySQL para mostrar el dashboard.")
+        return
 
     tiempo_promedio = df['Minutos'].mean()
     felices = int(es_optimo(df['SATISFACCION']).sum())
@@ -266,7 +281,6 @@ def vista_dashboard():
     df_grupos = df.groupby('GRUPO DE SERVICIO')['Minutos'].mean().reset_index()
     df_grupos['GRUPO DE SERVICIO'] = "Grupo " + df_grupos['GRUPO DE SERVICIO'].astype(int).astype(str)
     
-    # Agregamos texto formateado para las barras del gráfico
     df_grupos['Tiempo_Texto'] = df_grupos['Minutos'].apply(_formatear_minutos_a_mmss)
     
     fig1 = px.bar(df_grupos, x='GRUPO DE SERVICIO', y='Minutos',
@@ -287,7 +301,7 @@ def vista_inferencial():
     n_total = len(df)
 
     if n_total < 2:
-        st.warning("Se necesitan al menos 2 registros para hacer el análisis.")
+        st.warning("Se necesitan al menos 2 registros en MySQL para hacer el análisis.")
         return
 
     # ---------------- OBJETIVO 1 ----------------
@@ -381,19 +395,26 @@ def vista_inferencial():
 
 
 # ----------------------------------------------------------------------
-# PANTALLA 4: TABLA (se actualiza sola)
+# PANTALLA 4: TABLA MYSQL (se actualiza sola)
 # ----------------------------------------------------------------------
 @st.fragment(run_every=REFRESCO)
 def vista_excel():
-    st.title("Base de datos en tiempo real")
+    st.title("Base de datos MySQL en tiempo real")
     df = cargar_datos()
     st.caption(f"🔄 Actualización automática cada {REFRESCO} s · "
                f"{len(df)} registros · Última lectura: {datetime.now().strftime('%H:%M:%S')}")
+    
     st.dataframe(df, use_container_width=True)
 
-    with open(ARCHIVO, "rb") as f:
-        st.download_button("⬇️ Descargar Excel", f.read(), file_name="Datos.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    # ⚠️ MEJORA ADICIONAL: Permite exportar los datos directos de MySQL a CSV/Excel al instante
+    if not df.empty:
+        csv_data = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "⬇️ Descargar Reporte (CSV)",
+            data=csv_data,
+            file_name="Datos_Imprenta_MySQL.csv",
+            mime="text/csv"
+        )
 
 
 # ----------------------------------------------------------------------
