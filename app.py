@@ -13,9 +13,9 @@ from sqlalchemy import create_engine, text
 # ----------------------------------------------------------------------
 # ⚠️ CAMBIO REALIZADO: Se reemplazó el archivo Excel por credenciales MySQL
 DB_HOST = "sql.freedb.tech"
-DB_USER = "freedb_SdZBKmVn"
-DB_PASS = "GuRDzy62Ju88"
-DB_NAME = "imprenta_2"
+DB_USER = "u_QW9vxC"
+DB_PASS = "RVNeqAINUbeP"
+DB_NAME = "freedb_NHCmh0EU"
 DB_PORT = 3306
 DB_TABLE = "imprenta_2"
 
