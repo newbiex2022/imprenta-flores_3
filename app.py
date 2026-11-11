@@ -9,7 +9,7 @@ import numpy as np
 from sqlalchemy import create_engine, text
 
 # ----------------------------------------------------------------------
-# CONFIGURACIÓN SEGUARA - Base de Datos MySQL (Usando Streamlit Secrets)
+# CONFIGURACIÓN SEGURA - Base de Datos MySQL (Usando Streamlit Secrets)
 # ----------------------------------------------------------------------
 def cargar_configuracion_db():
     """
@@ -110,8 +110,9 @@ def _formatear_minutos_a_mmss(minutos_decimal):
         return str(minutos_decimal)
 
 
+@st.cache_data(ttl=5)
 def cargar_datos():
-    """Lee todas las filas de la tabla imprenta_2 en MySQL."""
+    """Lee todas las filas de la tabla imprenta_2 en MySQL con caché de 5s para evitar duplicaciones."""
     try:
         engine = obtener_conexion()
         query = f"SELECT codigo, grupo, servicio, tiempo, sexo, satisfaccion, fecha_actual FROM {DB_TABLE} ORDER BY codigo ASC"
@@ -278,6 +279,7 @@ def vista_registro():
                 minutos=tiempo,
                 satisfaccion="OPTIMO" if "Sí" in satisfaccion else "REGULAR",
             )
+            st.cache_data.clear()
             st.success(
                 "¡Listo! Registro guardado en MySQL. El dashboard y el análisis se actualizan solos."
             )
@@ -510,7 +512,7 @@ def vista_inferencial():
 
 
 # ----------------------------------------------------------------------
-# PANTALLA 4: TABLA MYSQL
+# PANTALLA 4: TABLA MYSQL (MODO INGENIERO)
 # ----------------------------------------------------------------------
 @st.fragment
 def vista_excel():
