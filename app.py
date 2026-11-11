@@ -147,8 +147,10 @@ def cargar_datos():
 
         df["Minutos"] = df["TIEMPO_EXCEL"].apply(_convertir_a_minutos)
         df["SATISFACCION"] = df["SATISFACCION"].astype(str).str.strip()
-        df.index = range(1, len(df) + 1)
-        return df
+
+# 🟢 CORRECCIÓN: Establece CODIGO como el único índice para evitar duplicidad visual
+df.set_index("CODIGO", inplace=True)  # ✅ Solución
+return df
 
     except Exception as e:
         st.error(f"Error de conexión o lectura en la base de datos MySQL: {e}")
@@ -526,7 +528,7 @@ def vista_excel():
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        csv_data = df.to_csv(index=False).encode("utf-8")
+        csv_data = df.to_csv(index=True).encode("utf-8")
         st.download_button(
             "⬇️ Descargar Reporte (CSV)",
             data=csv_data,
