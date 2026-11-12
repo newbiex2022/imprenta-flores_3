@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, time as dtime
+from datetime import datetime
 
 import streamlit as st
 import pandas as pd
@@ -9,14 +9,9 @@ import numpy as np
 from sqlalchemy import create_engine, text
 
 # ----------------------------------------------------------------------
-# CONFIGURACIÓN SEGURA - Base de Datos MySQL (Usando Streamlit Secrets)
+# CONFIGURACIÓN SEGURA - Base de Datos MySQL
 # ----------------------------------------------------------------------
 def cargar_configuracion_db():
-    """
-    Obtiene las credenciales de la base de datos de manera segura.
-    Lee primero de st.secrets (Local con secrets.toml o Streamlit Cloud).
-    Si no existen, intenta leer de variables de entorno (os.getenv).
-    """
     try:
         if "mysql" in st.secrets:
             return (
@@ -29,7 +24,6 @@ def cargar_configuracion_db():
     except Exception:
         pass
 
-    # Respaldo para servidores que usan variables de entorno tradicionales
     return (
         os.getenv("DB_HOST", "localhost"),
         os.getenv("DB_USER", "root"),
@@ -41,10 +35,9 @@ def cargar_configuracion_db():
 DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT = cargar_configuracion_db()
 DB_TABLE = "imprenta_2"
 
-REFRESCO = 5  # Cada cuántos segundos se actualizan las pantallas
-
 st.set_page_config(page_title="Imprenta Flores", layout="centered")
 
+# Menú lateral
 st.sidebar.title("Imprenta Flores")
 menu = st.sidebar.radio(
     "¿Qué deseas hacer?",
@@ -56,9 +49,6 @@ menu = st.sidebar.radio(
     ],
 )
 
-# ----------------------------------------------------------------------
-# CONFIGURACIÓN GLOBAL DE METAS (CON LÍMITES LÓGICOS)
-# ----------------------------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚙️ Configuración de Metas")
 
@@ -81,16 +71,13 @@ REF_SAT = st.sidebar.number_input(
 )
 
 # ----------------------------------------------------------------------
-# BASE DE DATOS (CONEXIÓN Y CONSULTAS MYSQL)
+# CONEXIÓN Y UTILIDADES
 # ----------------------------------------------------------------------
 def obtener_conexion():
-    """Crea y retorna una conexión a la base de datos MySQL mediante SQLAlchemy."""
     cadena_conexion = f"mysql+mysqlconnector://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     return create_engine(cadena_conexion)
 
-
 def _convertir_a_minutos(t):
-    """Convierte un objeto timedelta, time o cadena de MySQL a minutos decimales."""
     try:
         if isinstance(t, pd.Timedelta):
             return t.total_seconds() / 60.0
@@ -99,9 +86,7 @@ def _convertir_a_minutos(t):
         partes = str(t).split(":")
         return int(partes[0]) * 60 + int(partes[1]) + float(partes[2]) / 60.0
 
-
 def _formatear_minutos_a_mmss(minutos_decimal):
-    """Convierte un valor decimal de minutos a formato 'MM:SS'."""
     try:
         total_segundos = int(round(float(minutos_decimal) * 60))
         m, s = divmod(total_segundos, 60)
@@ -109,10 +94,7 @@ def _formatear_minutos_a_mmss(minutos_decimal):
     except Exception:
         return str(minutos_decimal)
 
-
-@st.cache_data(ttl=5)
 def cargar_datos():
-    """Lee todas las filas de la tabla imprenta_2 en MySQL con caché de 5s para evitar duplicaciones."""
     try:
         engine = obtener_conexion()
         query = f"SELECT codigo, grupo, servicio, tiempo, sexo, satisfaccion, fecha_actual FROM {DB_TABLE} ORDER BY codigo ASC"
@@ -121,14 +103,8 @@ def cargar_datos():
         if df.empty:
             return pd.DataFrame(
                 columns=[
-                    "CODIGO",
-                    "GRUPO DE SERVICIO",
-                    "SERVICIO",
-                    "TIEMPO_EXCEL",
-                    "SEXO",
-                    "SATISFACCION",
-                    "Minutos",
-                    "FECHA_ACTUAL",
+                    "CODIGO", "GRUPO DE SERVICIO", "SERVICIO", "TIEMPO_EXCEL",
+                    "SEXO", "SATISFACCION", "Minutos", "FECHA_ACTUAL"
                 ]
             )
 
@@ -154,9 +130,7 @@ def cargar_datos():
         st.error(f"Error de conexión o lectura en la base de datos MySQL: {e}")
         st.stop()
 
-
 def guardar_registro(grupo, servicio, sexo, minutos, satisfaccion):
-    """Agrega un registro a la tabla imprenta_2 en MySQL con timestamp automático."""
     total_seg = int(round(minutos * 60))
     m, s = divmod(total_seg, 60)
     h, m = divmod(m, 60)
@@ -182,7 +156,6 @@ def guardar_registro(grupo, servicio, sexo, minutos, satisfaccion):
             },
         )
 
-
 def intervalo_wilson(k, n, z=1.96):
     p = k / n
     den = 1 + z**2 / n
@@ -190,13 +163,41 @@ def intervalo_wilson(k, n, z=1.96):
     mitad = z * np.sqrt(p * (1 - p) / n + z**2 / (4 * n**2)) / den
     return centro - mitad, centro + mitad
 
-
 def es_optimo(serie):
     return serie.str.contains("OPTIMO", case=False, na=False)
 
+def renderizar_tabla_html_segura(df_input):
+    """Renderiza tablas en HTML puro, previniendo fallos en el motor de React."""
+    html_table = df_input.to_html(classes="tabla-estilizada", escape=False)
+    style = """
+    <style>
+        .tabla-estilizada {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 14px;
+            color: #ffffff;
+            background-color: #1e1e1e;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .tabla-estilizada th {
+            background-color: #333333;
+            color: #2ecc71;
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 2px solid #444;
+        }
+        .tabla-estilizada td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+    </style>
+    """
+    st.markdown(style + html_table, unsafe_allow_html=True)
 
 # ----------------------------------------------------------------------
-# COMPONENTE VISUAL: SEMÁFORO DE 3 LUCES
+# COMPONENTE VISUAL: SEMÁFORO
 # ----------------------------------------------------------------------
 def mostrar_semaforo_visual(tiempo_promedio, tiempo_ideal=5.0, tolerancia=1.2):
     umbral_amarillo = tiempo_ideal * tolerancia
@@ -204,71 +205,48 @@ def mostrar_semaforo_visual(tiempo_promedio, tiempo_ideal=5.0, tolerancia=1.2):
     if tiempo_promedio <= tiempo_ideal:
         estado = "verde"
         titulo = "🟢 ESTADO ÓPTIMO"
-        desc = f"El tiempo promedio (**{tiempo_promedio:.2f} min**) cumple perfectamente con la meta (≤ {tiempo_ideal:.1f} min)."
+        desc = f"El tiempo promedio (**{tiempo_promedio:.2f} min**) cumple la meta (≤ {tiempo_ideal:.1f} min)."
     elif tiempo_promedio <= umbral_amarillo:
         estado = "amarillo"
         titulo = "🟡 ESTADO DE PRECAUCIÓN"
-        desc = f"El tiempo promedio (**{tiempo_promedio:.2f} min**) excede un poco la meta ideal, manteniéndose en zona de precaución."
+        desc = f"El tiempo promedio (**{tiempo_promedio:.2f} min**) excede ligeramente la meta ideal."
     else:
         estado = "rojo"
-        titulo = "🔴 ESTADO CRÍTICO (DEMORADO)"
-        desc = f"El tiempo promedio (**{tiempo_promedio:.2f} min**) supera el límite aceptable. Se requiere optimizar procesos."
+        titulo = "🔴 ESTADO CRÍTICO"
+        desc = f"El tiempo promedio (**{tiempo_promedio:.2f} min**) supera el límite aceptable."
 
     c_rojo = "#ff4d4d" if estado == "rojo" else "#4d1a1a"
-    op_rojo = "1" if estado == "rojo" else "0.3"
-
     c_amarillo = "#ffcc00" if estado == "amarillo" else "#4d4d00"
-    op_amarillo = "1" if estado == "amarillo" else "0.3"
-
     c_verde = "#2ecc71" if estado == "verde" else "#143d21"
-    op_verde = "1" if estado == "verde" else "0.3"
 
     html_semaforo = f"""
-    <div style="background-color: #1e1e1e; padding: 20px; border-radius: 12px; border: 1px solid #333; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-around;">
-        <div style="text-align: center;">
-            <div style="display: flex; gap: 12px; background: #111; padding: 10px 18px; border-radius: 30px; border: 2px solid #444; box-shadow: inset 0 0 10px rgba(0,0,0,0.8);">
-                <div style="width: 30px; height: 30px; background-color: {c_rojo}; opacity: {op_rojo}; border-radius: 50%; box-shadow: 0 0 {'15px ' + c_rojo if estado=='rojo' else 'none'};"></div>
-                <div style="width: 30px; height: 30px; background-color: {c_amarillo}; opacity: {op_amarillo}; border-radius: 50%; box-shadow: 0 0 {'15px ' + c_amarillo if estado=='amarillo' else 'none'};"></div>
-                <div style="width: 30px; height: 30px; background-color: {c_verde}; opacity: {op_verde}; border-radius: 50%; box-shadow: 0 0 {'15px ' + c_verde if estado=='verde' else 'none'};"></div>
-            </div>
+    <div style="background-color: #1e1e1e; padding: 15px; border-radius: 10px; border: 1px solid #333; margin-bottom: 15px; display: flex; align-items: center;">
+        <div style="display: flex; gap: 10px; background: #111; padding: 8px 14px; border-radius: 20px;">
+            <div style="width: 20px; height: 20px; background-color: {c_rojo}; border-radius: 50%;"></div>
+            <div style="width: 20px; height: 20px; background-color: {c_amarillo}; border-radius: 50%;"></div>
+            <div style="width: 20px; height: 20px; background-color: {c_verde}; border-radius: 50%;"></div>
         </div>
-        <div style="flex-grow: 1; margin-left: 20px;">
-            <h4 style="margin: 0 0 5px 0; color: #fff; font-size: 18px;">{titulo}</h4>
-            <p style="margin: 0; color: #ccc; font-size: 14px;">{desc}</p>
+        <div style="margin-left: 15px;">
+            <h4 style="margin: 0; color: #fff;">{titulo}</h4>
+            <p style="margin: 0; color: #ccc; font-size: 13px;">{desc}</p>
         </div>
     </div>
     """
     st.markdown(html_semaforo, unsafe_allow_html=True)
 
-
 # ----------------------------------------------------------------------
-# PANTALLA 1: REGISTRO
+# VISTAS
 # ----------------------------------------------------------------------
 def vista_registro():
     st.title("Registrar Atención")
 
-    with st.form("registro_sencillo", clear_on_submit=True):
-        grupo = st.radio(
-            "¿Qué tipo de servicio fue?",
-            ["Grupo 1 (Copias/Impresiones)", "Grupo 2 (Trámites/Pasaporte)"],
-        )
-        servicio = st.text_input(
-            "¿Qué servicio exacto fue? (Ej. Copia, Foto, Pasaporte)"
-        )
-        sexo = st.radio("Sexo del cliente:", ["F", "M"], horizontal=True)
-        tiempo = st.number_input(
-            "¿Cuántos minutos demoró en total?",
-            min_value=0.1,
-            value=1.0,
-            step=0.5,
-        )
-        satisfaccion = st.radio(
-            "¿El cliente se fue contento con el servicio?",
-            ["Sí, OPTIMO 😊", "NO, hubo molestias 😞"],
-        )
-        enviar = st.form_submit_button(
-            "Guardar en el sistema ✔️", use_container_width=True
-        )
+    with st.form("registro_form", clear_on_submit=True):
+        grupo = st.radio("Tipo de servicio:", ["Grupo 1 (Copias/Impresiones)", "Grupo 2 (Trámites/Pasaporte)"])
+        servicio = st.text_input("Servicio exacto:")
+        sexo = st.radio("Sexo:", ["F", "M"], horizontal=True)
+        tiempo = st.number_input("Minutos transcurridos:", min_value=0.1, value=1.0, step=0.5)
+        satisfaccion = st.radio("Satisfacción:", ["Sí, OPTIMO 😊", "NO, hubo molestias 😞"])
+        enviar = st.form_submit_button("Guardar Registro ✔️", use_container_width=True)
 
     if enviar:
         try:
@@ -279,21 +257,18 @@ def vista_registro():
                 minutos=tiempo,
                 satisfaccion="OPTIMO" if "Sí" in satisfaccion else "REGULAR",
             )
-            st.cache_data.clear()
-            st.success(
-                "¡Listo! Registro guardado en MySQL. El dashboard y el análisis se actualizan solos."
-            )
+            st.success("¡Registro guardado en MySQL con éxito!")
+            st.rerun()
         except Exception as e:
-            st.error(f"No se pudo guardar el registro en MySQL: {e}")
+            st.error(f"Error al guardar: {e}")
 
     st.divider()
     st.subheader("Últimos registros")
     mostrar_ultimos()
 
-
 def mostrar_ultimos():
     df = cargar_datos()
-    st.caption(f"Total de clientes registrados: {len(df)}")
+    st.caption(f"Total registrados: {len(df)}")
 
     if not df.empty:
         df_visual = (
@@ -302,240 +277,91 @@ def mostrar_ultimos():
             .iloc[::-1]
             .copy()
         )
-        df_visual["TIEMPO (MM:SS)"] = df_visual["Minutos"].apply(
-            _formatear_minutos_a_mmss
-        )
-        df_visual = df_visual[
-            ["GRUPO DE SERVICIO", "SERVICIO", "TIEMPO (MM:SS)", "SEXO", "SATISFACCION"]
-        ]
-        st.dataframe(df_visual, use_container_width=True)
+        df_visual["TIEMPO (MM:SS)"] = df_visual["Minutos"].apply(_formatear_minutos_a_mmss)
+        df_visual = df_visual[["GRUPO DE SERVICIO", "SERVICIO", "TIEMPO (MM:SS)", "SEXO", "SATISFACCION"]]
+        renderizar_tabla_html_segura(df_visual)
 
-
-# ----------------------------------------------------------------------
-# PANTALLA 2: DASHBOARD DESCRIPTIVO
-# ----------------------------------------------------------------------
 def vista_dashboard():
-    st.title("Resumen de tu negocio")
+    st.title("Resumen del Negocio")
     df = cargar_datos()
-    st.caption(
-        f"🔄 Actualización automática cada {REFRESCO} s · "
-        f"Última lectura: {datetime.now().strftime('%H:%M:%S')}"
-    )
 
     if df.empty:
-        st.info("No hay datos guardados aún en MySQL para mostrar el dashboard.")
+        st.info("Sin registros en la base de datos.")
         return
 
     tiempo_promedio = df["Minutos"].mean()
     felices = int(es_optimo(df["SATISFACCION"]).sum())
-    porcentaje_felices = felices / len(df) * 100
+    porcentaje_felices = (felices / len(df)) * 100
 
-    mostrar_semaforo_visual(
-        tiempo_promedio=tiempo_promedio, tiempo_ideal=REF_TIEMPO
-    )
+    mostrar_semaforo_visual(tiempo_promedio=tiempo_promedio, tiempo_ideal=REF_TIEMPO)
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Clientes atendidos", len(df))
-    col2.metric(
-        "Tiempo Promedio General", f"{_formatear_minutos_a_mmss(tiempo_promedio)} min"
-    )
-    col3.metric("Clientes Felices", f"{porcentaje_felices:.0f}%")
+    # Tarjetas Métricas en HTML
+    metrics_html = f"""
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <div style="flex: 1; background: #1e1e1e; padding: 12px; border-radius: 8px; text-align: center;">
+            <span style="color: #888; font-size: 12px;">Clientes Atendidos</span>
+            <h2 style="margin: 5px 0 0 0; color: #fff;">{len(df)}</h2>
+        </div>
+        <div style="flex: 1; background: #1e1e1e; padding: 12px; border-radius: 8px; text-align: center;">
+            <span style="color: #888; font-size: 12px;">Tiempo Promedio</span>
+            <h2 style="margin: 5px 0 0 0; color: #fff;">{_formatear_minutos_a_mmss(tiempo_promedio)} m</h2>
+        </div>
+        <div style="flex: 1; background: #1e1e1e; padding: 12px; border-radius: 8px; text-align: center;">
+            <span style="color: #888; font-size: 12px;">Satisfacción</span>
+            <h2 style="margin: 5px 0 0 0; color: #fff;">{porcentaje_felices:.0f}%</h2>
+        </div>
+    </div>
+    """
+    st.markdown(metrics_html, unsafe_allow_html=True)
     st.divider()
 
-    st.subheader("Comparación por Grupo de Servicio")
+    st.subheader("Tiempos por Grupo")
     df_grupos = df.groupby("GRUPO DE SERVICIO")["Minutos"].mean().reset_index()
-    df_grupos["GRUPO DE SERVICIO"] = (
-        "Grupo " + df_grupos["GRUPO DE SERVICIO"].astype(int).astype(str)
-    )
+    df_grupos["GRUPO DE SERVICIO"] = "Grupo " + df_grupos["GRUPO DE SERVICIO"].astype(int).astype(str)
+    df_grupos["Tiempo_Texto"] = df_grupos["Minutos"].apply(_formatear_minutos_a_mmss)
 
-    df_grupos["Tiempo_Texto"] = df_grupos["Minutos"].apply(
-        _formatear_minutos_a_mmss
-    )
-
-    fig1 = px.bar(
-        df_grupos,
-        x="GRUPO DE SERVICIO",
-        y="Minutos",
-        color="GRUPO DE SERVICIO",
-        text="Tiempo_Texto",
-    )
+    fig1 = px.bar(df_grupos, x="GRUPO DE SERVICIO", y="Minutos", color="GRUPO DE SERVICIO", text="Tiempo_Texto")
     st.plotly_chart(fig1, use_container_width=True)
 
-
-# ----------------------------------------------------------------------
-# PANTALLA 3: INFERENCIA ESTADÍSTICA
-# ----------------------------------------------------------------------
 def vista_inferencial():
-    st.title("Análisis Estadístico del Negocio")
-    st.caption(
-        f"🔄 Actualización automática cada {REFRESCO} s · "
-        f"Última lectura: {datetime.now().strftime('%H:%M:%S')}"
-    )
-
+    st.title("Análisis Estadístico")
     df = cargar_datos()
     n_total = len(df)
 
     if n_total < 2:
-        st.warning(
-            "Se necesitan al menos 2 registros en MySQL para hacer el análisis."
-        )
+        st.warning("Se requieren al menos 2 registros.")
         return
 
-    # ---------------- OBJETIVO 1 ----------------
-    st.subheader("1. Estimación General del Servicio")
-    st.write("Confiabilidad estadística basada en las atenciones actuales:")
-
+    st.subheader("1. Estimación General")
     mean_time = df["Minutos"].mean()
     std_time = df["Minutos"].std()
-    if std_time > 0:
-        ci_time = stats.t.interval(
-            0.95, n_total - 1, loc=mean_time, scale=std_time / np.sqrt(n_total)
-        )
-    else:
-        ci_time = (mean_time, mean_time)
-
+    
+    ci_time = stats.t.interval(0.95, n_total - 1, loc=mean_time, scale=std_time / np.sqrt(n_total)) if std_time > 0 else (mean_time, mean_time)
     felices = int(es_optimo(df["SATISFACCION"]).sum())
 
-    lo = (
-        stats.beta.ppf(0.025, felices, n_total - felices + 1)
-        if felices > 0
-        else 0.0
-    )
-    hi = (
-        stats.beta.ppf(0.975, felices + 1, n_total - felices)
-        if felices < n_total
-        else 1.0
-    )
-    ci_prop = (lo * 100, hi * 100)
+    lo = stats.beta.ppf(0.025, felices, n_total - felices + 1) if felices > 0 else 0.0
+    hi = stats.beta.ppf(0.975, felices + 1, n_total - felices) if felices < n_total else 1.0
 
-    t_inf_str = f"{_formatear_minutos_a_mmss(ci_time[0])} a {_formatear_minutos_a_mmss(ci_time[1])}"
-    st.info(
-        f"🕒 **Tiempo de atención:** Con un 95% de seguridad, el tiempo real promedio por cliente se encuentra entre **{t_inf_str} min**."
-    )
-    st.info(
-        f"😊 **Satisfacción del cliente:** Con un 95% de seguridad, el porcentaje real de clientes satisfechos está entre **{ci_prop[0]:.2f}% y {ci_prop[1]:.2f}%**."
-    )
+    st.info(f"🕒 **Tiempo estimado (95% confianza):** {_formatear_minutos_a_mmss(ci_time[0])} a {_formatear_minutos_a_mmss(ci_time[1])} min.")
+    st.info(f"😊 **Satisfacción estimada (95% confianza):** {lo*100:.1f}% a {hi*100:.1f}%.")
 
-    st.divider()
-
-    # ---------------- OBJETIVO 2 ----------------
-    st.subheader("2. Comparación entre Grupos de Servicio")
-    st.write("Evaluando cuál grupo de servicio rinde mejor:")
-
-    g1 = df[df["GRUPO DE SERVICIO"] == 1]
-    g2 = df[df["GRUPO DE SERVICIO"] == 2]
-
-    if len(g1) > 1 and len(g2) > 1:
-        n1, n2 = len(g1), len(g2)
-        v1, v2 = g1["Minutos"].var(), g2["Minutos"].var()
-
-        diff_mean = g1["Minutos"].mean() - g2["Minutos"].mean()
-        se_diff = np.sqrt(v1 / n1 + v2 / n2)
-        if se_diff > 0:
-            gl = se_diff**4 / ((v1 / n1) ** 2 / (n1 - 1) + (v2 / n2) ** 2 / (n2 - 1))
-            tcrit = stats.t.ppf(0.975, gl)
-            ci_m = (diff_mean - tcrit * se_diff, diff_mean + tcrit * se_diff)
-        else:
-            ci_m = (diff_mean, diff_mean)
-
-        if ci_m[1] < 0:
-            concl = "El **Grupo 1**, correspondiente a Servicios de atención rápida es significativamente más rápido."
-        elif ci_m[0] > 0:
-            concl = "El **Grupo 2** correspondiente a Servicios de gestión documental es significativamente más rápido."
-        else:
-            concl = "No hay una diferencia de velocidad importante entre ambos grupos."
-        st.success(
-            f"⚖️ **Diferencia de tiempos (G1 vs G2):** Entre {ci_m[0]:.2f} a {ci_m[1]:.2f} min. {concl}"
-        )
-
-        k1 = int(es_optimo(g1["SATISFACCION"]).sum())
-        k2 = int(es_optimo(g2["SATISFACCION"]).sum())
-        p1, p2 = k1 / n1, k2 / n2
-        l1, u1 = intervalo_wilson(k1, n1)
-        l2, u2 = intervalo_wilson(k2, n2)
-        dp = p1 - p2
-        ci_p = (
-            dp - np.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2),
-            dp + np.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2),
-        )
-        st.success(
-            f"⚖️ **Diferencia de satisfacción entre Servicios de atención rápida y Servicios de gestión documental:** El margen de diferencia en clientes felices está entre **{ci_p[0] * 100:.1f}% y {ci_p[1] * 100:.1f}%**."
-        )
-
-        if min(n1, n2) < 10:
-            st.warning(
-                f"⚠️ Precaución: Un grupo tiene pocos datos ({min(n1, n2)} registros). Se recomienda registrar más atenciones para mayor precisión."
-            )
-    else:
-        st.warning(
-            "Se necesitan al menos 2 datos en cada grupo para hacer comparaciones."
-        )
-
-    st.divider()
-
-    # ---------------- OBJETIVO 3 ----------------
-    st.subheader("3. Evaluación de Metas del Negocio")
-    st.write(
-        f"Verificación frente a las metas globales configuradas (**{REF_TIEMPO} min** de tiempo y **{REF_SAT}%** de satisfacción):"
-    )
-
-    if std_time > 0:
-        _, p_val = stats.ttest_1samp(
-            df["Minutos"], REF_TIEMPO, alternative="less"
-        )
-        if p_val < 0.05:
-            st.success(
-                f"🟢 **Meta de Tiempo Cumplida:** El tiempo promedio está por debajo de la meta de {REF_TIEMPO} min (Demostrado estadísticamente)."
-            )
-        else:
-            st.error(
-                f"🔴 **Meta de Tiempo No Superada:** Todavía no hay evidencia suficiente de que estemos por debajo de los {REF_TIEMPO} min."
-            )
-    else:
-        st.warning("No hay suficiente variación de datos para probar la media.")
-
-    p_0 = REF_SAT / 100
-    p_val_prop = stats.binomtest(
-        felices, n_total, p_0, alternative="greater"
-    ).pvalue
-    if p_val_prop < 0.05:
-        st.success(
-            f"🟢 **Meta de Satisfacción Cumplida:** Superamos con éxito la meta del {REF_SAT}% de clientes felices."
-        )
-    else:
-        st.error(
-            f"🔴 **Meta de Satisfacción No Alcanzada:** Aún no alcanzamos consistentemente la meta del {REF_SAT}% de satisfacción."
-        )
-
-
-# ----------------------------------------------------------------------
-# PANTALLA 4: TABLA MYSQL (MODO INGENIERO)
-# ----------------------------------------------------------------------
 def vista_excel():
-    st.title("Últimos registros en tiempo real")
+    st.title("Modo Ingeniero (Registros BD)")
     df = cargar_datos()
-    st.caption(
-        f"🔄 Actualización automática cada {REFRESCO} s · "
-        f"{len(df)} registros · Última lectura: {datetime.now().strftime('%H:%M:%S')}"
-    )
+    st.caption(f"Total registros: {len(df)}")
 
-    st.dataframe(df, use_container_width=True)
+    renderizar_tabla_html_segura(df)
 
     if not df.empty:
-        # Genera CSV estructurado con separador ';' y BOM UTF-8 para abrir en celdas perfectas en Excel
         csv_data = df.to_csv(sep=";", index=True, encoding="utf-8-sig").encode("utf-8-sig")
-
         st.download_button(
-            "⬇️ Descargar Reporte (CSV para Excel)",
+            "⬇️ Descargar Reporte (CSV Excel)",
             data=csv_data,
             file_name="Datos_Imprenta_MySQL.csv",
             mime="text/csv",
         )
 
-
-# ----------------------------------------------------------------------
-# ENRUTADOR
-# ----------------------------------------------------------------------
+# Enrutador
 if menu == "⏱️ Registrar un cliente":
     vista_registro()
 elif menu == "📊 Dashboard Descriptivo":
