@@ -121,13 +121,13 @@ def cargar_datos():
         if df.empty:
             return pd.DataFrame(
                 columns=[
+                    "CODIGO",
                     "GRUPO DE SERVICIO",
                     "SERVICIO",
                     "TIEMPO_EXCEL",
                     "SEXO",
                     "SATISFACCION",
                     "Minutos",
-                    "CODIGO",
                     "FECHA_ACTUAL",
                 ]
             )
@@ -148,9 +148,9 @@ def cargar_datos():
         df["Minutos"] = df["TIEMPO_EXCEL"].apply(_convertir_a_minutos)
         df["SATISFACCION"] = df["SATISFACCION"].astype(str).str.strip()
 
-# 🟢 CORRECCIÓN: Establece CODIGO como el único índice para evitar duplicidad visual
-df.set_index("CODIGO", inplace=True)  # ✅ Solución
-return df
+        # 🟢 CORRECCIÓN: Indentado correctamente dentro del bloque try
+        df.set_index("CODIGO", inplace=True)
+        return df
 
     except Exception as e:
         st.error(f"Error de conexión o lectura en la base de datos MySQL: {e}")
