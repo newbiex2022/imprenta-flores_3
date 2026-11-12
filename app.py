@@ -393,7 +393,9 @@ def vista_excel():
 
     # sep=';' y encoding='utf-8-sig' para que Excel ordene cada dato debajo de su encabezado
     if not df.empty:
-        csv_data = df.to_csv(index=False, sep=';').encode('utf-8-sig')
+        df_export = df.copy()
+        df_export['FECHA_ACTUAL'] = df_export['FECHA_ACTUAL'].astype(str).apply(lambda x: f"\t{x}")
+        csv_data = df_export.to_csv(index=False, sep=';').encode('utf-8-sig')
         st.download_button(
             "⬇️ Descargar Reporte (CSV)",
             data=csv_data,
