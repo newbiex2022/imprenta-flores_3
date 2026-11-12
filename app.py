@@ -29,7 +29,6 @@ def cargar_configuracion_db():
     except Exception:
         pass
 
-    # Respaldo para servidores que usan variables de entorno tradicionales
     return (
         os.getenv("DB_HOST", "localhost"),
         os.getenv("DB_USER", "root"),
@@ -40,8 +39,6 @@ def cargar_configuracion_db():
 
 DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT = cargar_configuracion_db()
 DB_TABLE = "imprenta_2"
-
-REFRESCO = 5  # Cada cuántos segundos se actualizan las pantallas
 
 st.set_page_config(page_title="Imprenta Flores", layout="centered")
 
@@ -57,7 +54,7 @@ menu = st.sidebar.radio(
 )
 
 # ----------------------------------------------------------------------
-# CONFIGURACIÓN GLOBAL DE METAS (CON LÍMITES LÓGICOS)
+# CONFIGURACIÓN GLOBAL DE METAS
 # ----------------------------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚙️ Configuración de Metas")
@@ -110,9 +107,8 @@ def _formatear_minutos_a_mmss(minutos_decimal):
         return str(minutos_decimal)
 
 
-@st.cache_data(ttl=5)
 def cargar_datos():
-    """Lee todas las filas de la tabla imprenta_2 en MySQL con caché de 5s para evitar duplicaciones."""
+    """Lee todas las filas de la tabla imprenta_2 en MySQL de forma directa sin caché conflictivo."""
     try:
         engine = obtener_conexion()
         query = f"SELECT codigo, grupo, servicio, tiempo, sexo, satisfaccion, fecha_actual FROM {DB_TABLE} ORDER BY codigo ASC"
@@ -156,7 +152,7 @@ def cargar_datos():
 
 
 def guardar_registro(grupo, servicio, sexo, minutos, satisfaccion):
-    """Agrega un registro a la tabla imprenta_2 en MySQL con timestamp automático."""
+    """Agrega un registro a la tabla imprenta_2 en MySQL."""
     total_seg = int(round(minutos * 60))
     m, s = divmod(total_seg, 60)
     h, m = divmod(m, 60)
@@ -279,10 +275,7 @@ def vista_registro():
                 minutos=tiempo,
                 satisfaccion="OPTIMO" if "Sí" in satisfaccion else "REGULAR",
             )
-            st.cache_data.clear()
-            st.success(
-                "¡Listo! Registro guardado en MySQL. El dashboard y el análisis se actualizan solos."
-            )
+            st.success("¡Listo! Registro guardado en MySQL.")
         except Exception as e:
             st.error(f"No se pudo guardar el registro en MySQL: {e}")
 
@@ -308,7 +301,8 @@ def mostrar_ultimos():
         df_visual = df_visual[
             ["GRUPO DE SERVICIO", "SERVICIO", "TIEMPO (MM:SS)", "SEXO", "SATISFACCION"]
         ]
-        st.dataframe(df_visual, use_container_width=True)
+        # Renderizado en HTML plano para evitar desincronizaciones de React
+        st.table(df_visual)
 
 
 # ----------------------------------------------------------------------
@@ -317,10 +311,7 @@ def mostrar_ultimos():
 def vista_dashboard():
     st.title("Resumen de tu negocio")
     df = cargar_datos()
-    st.caption(
-        f"🔄 Actualización automática cada {REFRESCO} s · "
-        f"Última lectura: {datetime.now().strftime('%H:%M:%S')}"
-    )
+    st.caption(f"Última lectura: {datetime.now().strftime('%H:%M:%S')}")
 
     if df.empty:
         st.info("No hay datos guardados aún en MySQL para mostrar el dashboard.")
@@ -367,10 +358,7 @@ def vista_dashboard():
 # ----------------------------------------------------------------------
 def vista_inferencial():
     st.title("Análisis Estadístico del Negocio")
-    st.caption(
-        f"🔄 Actualización automática cada {REFRESCO} s · "
-        f"Última lectura: {datetime.now().strftime('%H:%M:%S')}"
-    )
+    st.caption(f"Última lectura: {datetime.now().strftime('%H:%M:%S')}")
 
     df = cargar_datos()
     n_total = len(df)
@@ -381,10 +369,7 @@ def vista_inferencial():
         )
         return
 
-    # ---------------- OBJETIVO 1 ----------------
     st.subheader("1. Estimación General del Servicio")
-    st.write("Confiabilidad estadística basada en las atenciones actuales:")
-
     mean_time = df["Minutos"].mean()
     std_time = df["Minutos"].std()
     if std_time > 0:
@@ -418,10 +403,7 @@ def vista_inferencial():
 
     st.divider()
 
-    # ---------------- OBJETIVO 2 ----------------
     st.subheader("2. Comparación entre Grupos de Servicio")
-    st.write("Evaluando cuál grupo de servicio rinde mejor:")
-
     g1 = df[df["GRUPO DE SERVICIO"] == 1]
     g2 = df[df["GRUPO DE SERVICIO"] == 2]
 
@@ -473,12 +455,7 @@ def vista_inferencial():
 
     st.divider()
 
-    # ---------------- OBJETIVO 3 ----------------
     st.subheader("3. Evaluación de Metas del Negocio")
-    st.write(
-        f"Verificación frente a las metas globales configuradas (**{REF_TIEMPO} min** de tiempo y **{REF_SAT}%** de satisfacción):"
-    )
-
     if std_time > 0:
         _, p_val = stats.ttest_1samp(
             df["Minutos"], REF_TIEMPO, alternative="less"
@@ -514,15 +491,12 @@ def vista_inferencial():
 def vista_excel():
     st.title("Últimos registros en tiempo real")
     df = cargar_datos()
-    st.caption(
-        f"🔄 Actualización automática cada {REFRESCO} s · "
-        f"{len(df)} registros · Última lectura: {datetime.now().strftime('%H:%M:%S')}"
-    )
+    st.caption(f"{len(df)} registros · Última lectura: {datetime.now().strftime('%H:%M:%S')}")
 
-    st.dataframe(df, use_container_width=True)
+    # Uso de st.table estático para garantizar inmunidad a errores de React
+    st.table(df)
 
     if not df.empty:
-        # Genera CSV estructurado con separador ';' y BOM UTF-8 para abrir en celdas perfectas en Excel
         csv_data = df.to_csv(sep=";", index=True, encoding="utf-8-sig").encode("utf-8-sig")
 
         st.download_button(
