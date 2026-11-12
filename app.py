@@ -9,17 +9,16 @@ import numpy as np
 from sqlalchemy import create_engine, text
 
 # ------version 1----------------------------------------------------------------
-# CONFIGURACIÓN - Base de Datos MySQL
+# CONFIGURACIÓN - Base de Datos MySQL desde Streamlit Secrets
 # ----------------------------------------------------------------------
-# ⚠️ CAMBIO REALIZADO: Se reemplazó el archivo Excel por credenciales MySQL
-DB_HOST = "sql.freedb.tech"
-DB_USER = "u_QW9vxC"
-DB_PASS = "RVNeqAINUbeP"
-DB_NAME = "freedb_NHCmh0EU"
-DB_PORT = 3306
-DB_TABLE = "imprenta_2"
+DB_HOST = st.secrets["mysql"]["host"]
+DB_USER = st.secrets["mysql"]["user"]
+DB_PASS = st.secrets["mysql"]["password"]
+DB_NAME = st.secrets["mysql"]["database"]
+DB_PORT = st.secrets["mysql"]["port"]
+DB_TABLE = st.secrets["mysql"]["table"]
 
-REFRESCO = 5 # Cada cuántos segundos se actualizan las pantallas
+REFRESCO = 5  # Cada cuántos segundos se actualizan las pantallas
 
 st.set_page_config(page_title="Imprenta Flores", layout="centered")
 
@@ -58,7 +57,6 @@ REF_SAT = st.sidebar.number_input(
 # ----------------------------------------------------------------------
 # BASE DE DATOS (CONEXIÓN Y CONSULTAS MYSQL)
 # ----------------------------------------------------------------------
-# ⚠️ CAMBIO REALIZADO: Conexión mediante SQLAlchemy optimizada para Streamlit
 def obtener_conexion():
     """Crea y retorna una conexión a la base de datos MySQL."""
     cadena_conexion = f"mysql+mysqlconnector://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
@@ -83,19 +81,16 @@ def _formatear_minutos_a_mmss(minutos_decimal):
     except Exception:
         return str(minutos_decimal)
 
-# ⚠️ CAMBIO REALIZADO: Carga directa desde MySQL usando pandas read_sql
 def cargar_datos():
-    """Lee todas las filas de la tabla imprenta_2 en MySQL y formatea las columnas igual que la versión de Excel."""
+    """Lee todas las filas de la tabla en MySQL y formatea las columnas."""
     try:
         engine = obtener_conexion()
         query = f"SELECT codigo, grupo, servicio, tiempo, sexo, satisfaccion, fecha_actual FROM {DB_TABLE} ORDER BY codigo ASC"
         df = pd.read_sql(query, con=engine)
         
         if df.empty:
-            # Retornar estructura base en caso de tabla vacía
-            return pd.DataFrame(columns=['GRUPO DE SERVICIO', 'SERVICIO', 'TIEMPO_EXCEL', 'SEXO', 'SATISFACCION', 'Minutos', 'CODIGO', 'FECHA_ACTUAL'])
+            return pd.DataFrame(columns=['CODIGO', 'GRUPO DE SERVICIO', 'SERVICIO', 'TIEMPO_EXCEL', 'SEXO', 'SATISFACCION', 'Minutos', 'FECHA_ACTUAL'])
 
-        # Mapeo a las columnas que consume la lógica original
         df.rename(columns={
             'codigo': 'CODIGO',
             'grupo': 'GRUPO DE SERVICIO',
@@ -108,16 +103,18 @@ def cargar_datos():
 
         df['Minutos'] = df['TIEMPO_EXCEL'].apply(_convertir_a_minutos)
         df['SATISFACCION'] = df['SATISFACCION'].astype(str).str.strip()
-        df.index = range(1, len(df) + 1)
+        
+        # Limpiar formato de TIEMPO_EXCEL si viene como timedelta para que se vea limpio en tabla y CSV
+        df['TIEMPO_EXCEL'] = df['TIEMPO_EXCEL'].astype(str).str.replace('0 days ', '', regex=False)
+        
         return df
 
     except Exception as e:
         st.error(f"Error de conexión o lectura en la base de datos MySQL: {e}")
         st.stop()
 
-# ⚠️ CAMBIO REALIZADO: Reemplazo de escritura en Excel por la sentencia INSERT de MySQL
 def guardar_registro(grupo, servicio, sexo, minutos, satisfaccion):
-    """Agrega un registro a la tabla imprenta_2 en MySQL con timestamp automático."""
+    """Agrega un registro a la tabla en MySQL con timestamp automático."""
     total_seg = int(round(minutos * 60))
     m, s = divmod(total_seg, 60)
     h, m = divmod(m, 60)
@@ -235,10 +232,10 @@ def mostrar_ultimos():
     st.caption(f"Total de clientes registrados: {len(df)}")
     
     if not df.empty:
-        df_visual = df[['GRUPO DE SERVICIO', 'SERVICIO', 'Minutos', 'SEXO', 'SATISFACCION']].tail(5).iloc[::-1].copy()
+        df_visual = df[['CODIGO', 'GRUPO DE SERVICIO', 'SERVICIO', 'Minutos', 'SEXO', 'SATISFACCION']].tail(5).iloc[::-1].copy()
         df_visual['TIEMPO (MM:SS)'] = df_visual['Minutos'].apply(_formatear_minutos_a_mmss)
-        df_visual = df_visual[['GRUPO DE SERVICIO', 'SERVICIO', 'TIEMPO (MM:SS)', 'SEXO', 'SATISFACCION']]
-        st.dataframe(df_visual, use_container_width=True)
+        df_visual = df_visual[['CODIGO', 'GRUPO DE SERVICIO', 'SERVICIO', 'TIEMPO (MM:SS)', 'SEXO', 'SATISFACCION']]
+        st.dataframe(df_visual, use_container_width=True, hide_index=True)
 
 # ----------------------------------------------------------------------
 # PANTALLA 2: DASHBOARD DESCRIPTIVO (se actualiza solo)
@@ -300,7 +297,7 @@ def vista_inferencial():
     std_time = df['Minutos'].std()
     if std_time > 0:
         ci_time = stats.t.interval(0.95, n_total - 1, loc=mean_time,
-                                    scale=std_time / np.sqrt(n_total))
+                                   scale=std_time / np.sqrt(n_total))
     else:
         ci_time = (mean_time, mean_time)
 
@@ -391,11 +388,12 @@ def vista_excel():
     st.caption(f"🔄 Actualización automática cada {REFRESCO} s · "
                f"{len(df)} registros · Última lectura: {datetime.now().strftime('%H:%M:%S')}")
     
-    st.dataframe(df, use_container_width=True)
+    # hide_index=True elimina la columna numérica extra y deja solo CODIGO
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
-    # ⚠️ MEJORA ADICIONAL: Permite exportar los datos directos de MySQL a CSV/Excel al instante
+    # sep=';' y encoding='utf-8-sig' para que Excel ordene cada dato debajo de su encabezado
     if not df.empty:
-        csv_data = df.to_csv(index=False).encode('utf-8')
+        csv_data = df.to_csv(index=False, sep=';').encode('utf-8-sig')
         st.download_button(
             "⬇️ Descargar Reporte (CSV)",
             data=csv_data,
@@ -414,4 +412,3 @@ elif menu == "📈 Análisis Inferencial":
     vista_inferencial()
 else:
     vista_excel()
-
