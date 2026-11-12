@@ -89,13 +89,13 @@ def cargar_datos():
         df = pd.read_sql(query, con=engine)
         
         if df.empty:
-            return pd.DataFrame(columns=['CODIGO', 'GRUPO DE SERVICIO', 'SERVICIO', 'TIEMPO_EXCEL1', 'SEXO', 'SATISFACCION', 'Minutos', 'FECHA_ACTUAL'])
+            return pd.DataFrame(columns=['CODIGO', 'GRUPO DE SERVICIO', 'SERVICIO', 'TIEMPO_EXCEL', 'SEXO', 'SATISFACCION', 'Minutos', 'FECHA_ACTUAL'])
 
         df.rename(columns={
             'codigo': 'CODIGO',
             'grupo': 'GRUPO DE SERVICIO',
             'servicio': 'SERVICIO',
-            'tiempo': 'TIEMPO_EXCEL',
+            'tiempo': 'TIEMPO_EXCEL1',
             'sexo': 'SEXO',
             'satisfaccion': 'SATISFACCION',
             'fecha_actual': 'FECHA_ACTUAL'
