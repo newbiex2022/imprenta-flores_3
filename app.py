@@ -55,11 +55,11 @@ REF_SAT = st.sidebar.number_input(
 )
 
 # ----------------------------------------------------------------------
-# BASE DE DATOS (CONEXIÓN Y CONSULTAS MYSQL)
+# BASE DE DATOS (CONEXIÓN Y CONSULTAS MYSQL CON PYMYSQL)
 # ----------------------------------------------------------------------
 def obtener_conexion():
-    """Crea y retorna una conexión a la base de datos MySQL."""
-    cadena_conexion = f"mysql+mysqlconnector://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    """Crea y retorna una conexión a la base de datos MySQL usando PyMySQL."""
+    cadena_conexion = f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     return create_engine(cadena_conexion)
 
 def _convertir_a_minutos(t):
