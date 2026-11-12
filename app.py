@@ -1,4 +1,5 @@
 import os
+import io
 from datetime import datetime, time as dtime
 
 import streamlit as st
@@ -518,7 +519,7 @@ def vista_inferencial():
 # ----------------------------------------------------------------------
 @st.fragment
 def vista_excel():
-    st.title("Ultimos registros en tiempo real")
+    st.title("Últimos registros en tiempo real")
     df = cargar_datos()
     st.caption(
         f"🔄 Actualización automática cada {REFRESCO} s · "
@@ -528,12 +529,17 @@ def vista_excel():
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        csv_data = df.to_csv(index=True).encode("utf-8")
+        # 🟢 Generar archivo Excel nativo (.xlsx) estructurado en memoria
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            df.to_excel(writer, index=True, sheet_name="Datos_Imprenta")
+        buffer.seek(0)
+
         st.download_button(
-            "⬇️ Descargar Reporte (CSV)",
-            data=csv_data,
-            file_name="Datos_Imprenta_MySQL.csv",
-            mime="text/csv",
+            "⬇️ Descargar Reporte (.xlsx)",
+            data=buffer,
+            file_name="Datos_Imprenta_MySQL.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
 
