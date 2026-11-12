@@ -95,7 +95,7 @@ def cargar_datos():
             'codigo': 'CODIGO',
             'grupo': 'GRUPO DE SERVICIO',
             'servicio': 'SERVICIO',
-            'tiempo': 'TIEMPO_EXCEL1',
+            'tiempo': 'TIEMPO_EXCEL',
             'sexo': 'SEXO',
             'satisfaccion': 'SATISFACCION',
             'fecha_actual': 'FECHA_ACTUAL'
