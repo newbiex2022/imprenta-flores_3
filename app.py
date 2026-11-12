@@ -148,8 +148,6 @@ def cargar_datos():
 
         df["Minutos"] = df["TIEMPO_EXCEL"].apply(_convertir_a_minutos)
         df["SATISFACCION"] = df["SATISFACCION"].astype(str).str.strip()
-
-        # 🟢 CORRECCIÓN: Indentado correctamente dentro del bloque try
         df.set_index("CODIGO", inplace=True)
         return df
 
@@ -294,7 +292,6 @@ def vista_registro():
     mostrar_ultimos()
 
 
-@st.fragment
 def mostrar_ultimos():
     df = cargar_datos()
     st.caption(f"Total de clientes registrados: {len(df)}")
@@ -318,7 +315,6 @@ def mostrar_ultimos():
 # ----------------------------------------------------------------------
 # PANTALLA 2: DASHBOARD DESCRIPTIVO
 # ----------------------------------------------------------------------
-@st.fragment
 def vista_dashboard():
     st.title("Resumen de tu negocio")
     df = cargar_datos()
@@ -370,7 +366,6 @@ def vista_dashboard():
 # ----------------------------------------------------------------------
 # PANTALLA 3: INFERENCIA ESTADÍSTICA
 # ----------------------------------------------------------------------
-@st.fragment
 def vista_inferencial():
     st.title("Análisis Estadístico del Negocio")
     st.caption(
@@ -517,7 +512,6 @@ def vista_inferencial():
 # ----------------------------------------------------------------------
 # PANTALLA 4: TABLA MYSQL (MODO INGENIERO)
 # ----------------------------------------------------------------------
-@st.fragment
 def vista_excel():
     st.title("Últimos registros en tiempo real")
     df = cargar_datos()
@@ -529,7 +523,6 @@ def vista_excel():
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        # 🟢 Generar archivo Excel nativo (.xlsx) estructurado en memoria
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
             df.to_excel(writer, index=True, sheet_name="Datos_Imprenta")
