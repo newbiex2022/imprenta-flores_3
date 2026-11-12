@@ -8,7 +8,7 @@ import scipy.stats as stats
 import numpy as np
 from sqlalchemy import create_engine, text
 
-# ----------------------------------------------------------------------
+# ------version 1----------------------------------------------------------------
 # CONFIGURACIÓN - Base de Datos MySQL
 # ----------------------------------------------------------------------
 # ⚠️ CAMBIO REALIZADO: Se reemplazó el archivo Excel por credenciales MySQL
