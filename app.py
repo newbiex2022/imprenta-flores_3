@@ -15,8 +15,8 @@ DB_HOST = st.secrets["mysql"]["host"]
 DB_USER = st.secrets["mysql"]["user"]
 DB_PASS = st.secrets["mysql"]["password"]
 DB_NAME = st.secrets["mysql"]["database"]
-DB_PORT = st.secrets["mysql"]["port"]
-DB_TABLE = st.secrets["mysql"]["table"]
+DB_PORT = st.secrets["mysql"].get("port", 3306)
+DB_TABLE = st.secrets["mysql"].get("table", "imprenta_2")
 
 REFRESCO = 5  # Cada cuántos segundos se actualizan las pantallas
 
