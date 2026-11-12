@@ -1,5 +1,4 @@
 import os
-import io
 from datetime import datetime, time as dtime
 
 import streamlit as st
@@ -531,17 +530,15 @@ def vista_excel():
         st.dataframe(df, use_container_width=True, key="tabla_modo_ingeniero")
 
     if not df.empty:
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-            df.to_excel(writer, index=True, sheet_name="Datos_Imprenta")
-        buffer.seek(0)
+        # 🟢 Genera CSV estructurado con separador ';' y BOM UTF-8 para abrir en celdas perfectas en Excel
+        csv_data = df.to_csv(sep=";", index=True, encoding="utf-8-sig").encode("utf-8-sig")
 
         st.download_button(
-            "⬇️ Descargar Reporte (.xlsx)",
-            data=buffer,
-            file_name="Datos_Imprenta_MySQL.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="btn_descarga_excel",
+            "⬇️ Descargar Reporte (CSV para Excel)",
+            data=csv_data,
+            file_name="Datos_Imprenta_MySQL.csv",
+            mime="text/csv",
+            key="btn_descarga_csv",
         )
 
 
