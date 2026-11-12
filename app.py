@@ -45,9 +45,6 @@ REFRESCO = 5  # Cada cuántos segundos se actualizan las pantallas
 
 st.set_page_config(page_title="Imprenta Flores", layout="centered")
 
-# 🟢 Previene que traductores automáticos del navegador rompan el DOM de React
-st.markdown('<meta name="google" content="notranslate">', unsafe_allow_html=True)
-
 st.sidebar.title("Imprenta Flores")
 menu = st.sidebar.radio(
     "¿Qué deseas hacer?",
@@ -311,10 +308,7 @@ def mostrar_ultimos():
         df_visual = df_visual[
             ["GRUPO DE SERVICIO", "SERVICIO", "TIEMPO (MM:SS)", "SEXO", "SATISFACCION"]
         ]
-        
-        # 🟢 Contenedor estático con clave única
-        with st.container():
-            st.dataframe(df_visual, use_container_width=True, key="tabla_ultimos")
+        st.dataframe(df_visual, use_container_width=True)
 
 
 # ----------------------------------------------------------------------
@@ -365,7 +359,7 @@ def vista_dashboard():
         color="GRUPO DE SERVICIO",
         text="Tiempo_Texto",
     )
-    st.plotly_chart(fig1, use_container_width=True, key="grafico_grupos")
+    st.plotly_chart(fig1, use_container_width=True)
 
 
 # ----------------------------------------------------------------------
@@ -525,12 +519,10 @@ def vista_excel():
         f"{len(df)} registros · Última lectura: {datetime.now().strftime('%H:%M:%S')}"
     )
 
-    # 🟢 Contenedor estable con clave única para la tabla
-    with st.container():
-        st.dataframe(df, use_container_width=True, key="tabla_modo_ingeniero")
+    st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        # 🟢 Genera CSV estructurado con separador ';' y BOM UTF-8 para abrir en celdas perfectas en Excel
+        # Genera CSV estructurado con separador ';' y BOM UTF-8 para abrir en celdas perfectas en Excel
         csv_data = df.to_csv(sep=";", index=True, encoding="utf-8-sig").encode("utf-8-sig")
 
         st.download_button(
@@ -538,7 +530,6 @@ def vista_excel():
             data=csv_data,
             file_name="Datos_Imprenta_MySQL.csv",
             mime="text/csv",
-            key="btn_descarga_csv",
         )
 
 
