@@ -218,9 +218,9 @@ def vista_registro():
                 minutos=tiempo,
                 satisfaccion='OPTIMO' if "Sí" in satisfaccion else 'REGULAR',
             )
-            st.success("¡Listo! Registro guardado en MySQL. El dashboard y el análisis se actualizan solos.")
+            st.success("El registro fue guardado correctamente")
         except Exception as e:
-            st.error(f"No se pudo guardar el registro en MySQL: {e}")
+            st.error(f"No se pudo guardar el registro en la BD: {e}")
 
     st.divider()
     st.subheader("Últimos registros")
@@ -399,7 +399,7 @@ def vista_excel():
         st.download_button(
             "⬇️ Descargar Reporte (CSV)",
             data=csv_data,
-            file_name="Datos_Imprenta_MySQL.csv",
+            file_name="Datos_Imprenta.csv",
             mime="text/csv"
         )
 
