@@ -248,7 +248,7 @@ def vista_dashboard():
                f"Última lectura: {datetime.now().strftime('%H:%M:%S')}")
 
     if df.empty:
-        st.info("No hay datos guardados aún en MySQL para mostrar el dashboard.")
+        st.info("No hay datos guardados aún para mostrar")
         return
 
     tiempo_promedio = df['Minutos'].mean()
