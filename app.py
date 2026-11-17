@@ -410,7 +410,7 @@ if menu == "⏱️ Registrar un cliente":
     vista_registro()
 elif menu == "📊 Dashboard Descriptivo":
     vista_dashboard()
-elif menu == "📈 Análisis Inferencial":
+elif menu == "📈 Análisis del negocio":
     vista_inferencial()
 else:
     vista_excel()
